@@ -4,32 +4,39 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 
 function App() {
+  const [userId, setUserId] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Optional: persist login across page reload
   useEffect(() => {
+    const storedUserId = sessionStorage.getItem("userId");
     const storedEmail = sessionStorage.getItem("userEmail");
-    if (storedEmail) {
+    if (storedUserId && storedEmail) {
+      setUserId(storedUserId);
       setUserEmail(storedEmail);
       setIsLoggedIn(true);
     }
   }, []);
 
-  const handleLoginSuccess = (email) => {
-    if (!isLoggedIn) {           // allow login only if not already logged in
+  const handleLoginSuccess = (userId, email) => {
+    if (!isLoggedIn) {
+      setUserId(userId);
       setUserEmail(email);
       setIsLoggedIn(true);
-      sessionStorage.setItem("userEmail", email); // persist login for session
+      sessionStorage.setItem("userId", userId);
+      sessionStorage.setItem("userEmail", email);
     } else {
       alert("You are already logged in!");
     }
   };
 
   const handleLogout = () => {
+    setUserId("");
     setUserEmail("");
     setIsLoggedIn(false);
-    sessionStorage.removeItem("userEmail"); // clear session
+    sessionStorage.removeItem("userId");
+    sessionStorage.removeItem("userEmail");
   };
 
   return (
@@ -49,7 +56,7 @@ function App() {
           path="/dashboard"
           element={
             isLoggedIn ? (
-              <Dashboard email={userEmail} onLogout={handleLogout} />
+              <Dashboard userId={userId} email={userEmail} onLogout={handleLogout} />
             ) : (
               <Navigate to="/" />
             )

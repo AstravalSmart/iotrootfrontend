@@ -18,10 +18,10 @@ const Login = ({ onLoginSuccess }) => {
         setIsRegister(false);
       } else {
         const res = await api.post("/auth/login", { email, password });
-        if (res.data === "Login success") {
-          onLoginSuccess(email);
+        if (res.data.success) {
+          onLoginSuccess(res.data.userId, email);
         } else {
-          setMessage(res.data);
+          setMessage(res.data.message);
         }
       }
     } catch (err) {
