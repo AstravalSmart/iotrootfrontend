@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import Home from "./pages/Home";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
+import MainDashboard from "./pages/MainDashboard";
 
 function App() {
   const [userId, setUserId] = useState("");
@@ -48,6 +49,16 @@ function App() {
             isLoggedIn ? (
               <Navigate to="/dashboard" />
             ) : (
+              <Home />
+            )
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            isLoggedIn ? (
+              <Navigate to="/dashboard" />
+            ) : (
               <Login onLoginSuccess={handleLoginSuccess} />
             )
           }
@@ -56,9 +67,19 @@ function App() {
           path="/dashboard"
           element={
             isLoggedIn ? (
-              <Dashboard userId={userId} email={userEmail} onLogout={handleLogout} />
+              <Navigate to="/dashboard/overview" />
             ) : (
-              <Navigate to="/" />
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/dashboard/:section"
+          element={
+            isLoggedIn ? (
+              <MainDashboard userId={userId} email={userEmail} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" />
             )
           }
         />
