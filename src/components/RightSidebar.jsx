@@ -69,7 +69,7 @@ const RightSidebar = ({ email, onLogout }) => {
     localStorage.removeItem('token');
     sessionStorage.clear();
     if (onLogout) onLogout();
-    window.location.href = '/login';
+    window.location.href = '/';
   };
 
   return (
