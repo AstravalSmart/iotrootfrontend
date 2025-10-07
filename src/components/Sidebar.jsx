@@ -7,6 +7,17 @@ const Sidebar = ({ sidebarCollapsed, setSidebarCollapsed, activeSection, setActi
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const [favoriteItems, setFavoriteItems] = useState([]);
+  const [usageCount, setUsageCount] = useState({});
+  const [lastClicked, setLastClicked] = useState(null);
+
+  useEffect(() => {
+    const isMobileScreen = window.innerWidth < 768;
+    if (isMobileScreen !== sidebarCollapsed) {
+      setSidebarCollapsed(isMobileScreen);
+    }
+  }, []);
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -15,10 +26,80 @@ const Sidebar = ({ sidebarCollapsed, setSidebarCollapsed, activeSection, setActi
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Load user favorites from backend
+  useEffect(() => {
+    if (email) {
+      fetch(`http://192.168.1.8:8080/api/usage/favorites/${email}`)
+        .then(res => res.json())
+        .then(data => {
+          const items = data.map(usage => getItemById(usage.sectionId)).filter(Boolean);
+          setFavoriteItems(items);
+        })
+        .catch(err => console.error('Failed to load favorites:', err));
+    }
+  }, [email]);
+
+  // Get item details by ID
+  const getItemById = (id) => {
+    if (id === 'overview') return { id: 'overview', label: 'Project Overview', icon: <Icons.Overview /> };
+    
+    for (const category of navigationCategories) {
+      for (const item of category.items) {
+        if (item.id === id) return { id: item.id, label: item.label, icon: item.icon };
+        if (item.subItems) {
+          const subItem = item.subItems.find(sub => sub.id === id);
+          if (subItem) return { id: subItem.id, label: subItem.label, icon: subItem.icon };
+        }
+      }
+    }
+    return null;
+  };
+
+  // Track usage with consecutive click logic
+  const trackUsage = async (sectionId) => {
+    if (!email) return;
+    
+    // Check if item is already in favorites - if yes, don't track
+    const isInFavorites = favoriteItems.some(item => item.id === sectionId);
+    if (isInFavorites) return;
+    
+    const currentCount = usageCount[sectionId] || 0;
+    const newCount = lastClicked === sectionId ? currentCount + 1 : 1;
+    
+    setUsageCount(prev => ({ ...prev, [sectionId]: newCount }));
+    setLastClicked(sectionId);
+    
+    // Send to backend only after 2 consecutive clicks
+    if (newCount >= 2) {
+      try {
+        await fetch('http://192.168.1.8:8080/api/usage/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, sectionId })
+        });
+        
+        // Refresh favorites
+        const res = await fetch(`http://192.168.1.8:8080/api/usage/favorites/${email}`);
+        const data = await res.json();
+        const items = data.map(usage => getItemById(usage.sectionId)).filter(Boolean);
+        setFavoriteItems(items);
+        
+        // Reset count after sending to backend
+        setUsageCount(prev => ({ ...prev, [sectionId]: 0 }));
+      } catch (err) {
+        console.error('Failed to track usage:', err);
+      }
+    }
+  };
+
+  // Enhanced setActiveSection with usage tracking
+  const handleSetActiveSection = (sectionId) => {
+    setActiveSection(sectionId);
+    trackUsage(sectionId);
+  };
   
-  const favoriteItems = [
-    { id: 'device-registry', label: 'Device Registry', icon: <Icons.Device /> },
-  ];
+
 
   const navigationCategories = [
     {
@@ -30,8 +111,7 @@ const Sidebar = ({ sidebarCollapsed, setSidebarCollapsed, activeSection, setActi
           expandable: true,
           subItems: [
             { id: 'device-registry', label: 'Device Registry', icon: <Icons.Device /> },
-            { id: 'thing-abstraction', label: 'Thing Abstraction', icon: <Icons.Overview /> },
-            { id: 'codebase-ota', label: 'Codebase & OTA', icon: <Icons.Data /> },
+            { id: 'thing', label: 'Thing', icon: <Icons.Overview /> },
           ]
         },
       ]
@@ -87,6 +167,16 @@ const Sidebar = ({ sidebarCollapsed, setSidebarCollapsed, activeSection, setActi
     {
       title: 'Management',
       items: [
+
+        { 
+          id: 'codebase', 
+          label: 'Firmware & Codebase', 
+          expandable: true,
+          subItems: [
+            { id: 'code-base', label: 'Code Base', icon: <Icons.Code /> },
+            { id: 'ota', label: 'OTA Pipeline', icon: <Icons.Upload /> },
+          ]
+        },
         { 
           id: 'data', 
           label: 'Data Layer', 
@@ -162,7 +252,7 @@ const Sidebar = ({ sidebarCollapsed, setSidebarCollapsed, activeSection, setActi
         className="p-4  flex items-center justify-center cursor-pointer hover:bg-gray-50 transition"
         onClick={(e) => {
           e.stopPropagation();
-          setActiveSection('overview');
+          handleSetActiveSection('overview');
         }}
       >
         {!sidebarCollapsed ? (
@@ -185,7 +275,7 @@ const Sidebar = ({ sidebarCollapsed, setSidebarCollapsed, activeSection, setActi
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setActiveSection('overview');
+              handleSetActiveSection('overview');
             }}
             className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center px-1 py-0.5' : 'space-x-3 px-2 py-1'} rounded-md text-left text-sm transition group ${
               activeSection === 'overview'
@@ -193,7 +283,7 @@ const Sidebar = ({ sidebarCollapsed, setSidebarCollapsed, activeSection, setActi
                 : 'text-gray-700 hover:bg-gray-100'
             }`}
           >
-            <div className="flex-shrink-0"><Icons.Overview /></div>
+            {/* <div className="flex-shrink-0"><Icons.Overview /></div> */}
             {(!sidebarCollapsed || isMobile) && <span>Project Overview</span>}
             
             {/* Hover Tooltip */}
@@ -218,7 +308,7 @@ const Sidebar = ({ sidebarCollapsed, setSidebarCollapsed, activeSection, setActi
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setActiveSection(item.id);
+                    handleSetActiveSection(item.id);
                   }}
                   className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center px-1 py-0.5' : 'space-x-3 px-2 py-1'} rounded-md text-left text-sm transition group ${
                     activeSection === item.id
@@ -261,11 +351,14 @@ const Sidebar = ({ sidebarCollapsed, setSidebarCollapsed, activeSection, setActi
                         // Close all other sections and toggle current
                         setExpandedSections({ [item.id]: !expandedSections[item.id] });
                       } else {
-                        setActiveSection(item.id);
+                        handleSetActiveSection(item.id);
                       }
                     }}
+
                     className={`w-full flex items-center justify-between px-2 py-1 rounded-md text-left text-sm transition group ${
-                      activeSection === item.id
+                      expandedSections[item.id]
+                        ? 'bg-blue-50 text-blue-600 font-medium'
+                        : activeSection === item.id
                         ? 'bg-blue-100 text-blue-700 font-medium'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
@@ -290,7 +383,8 @@ const Sidebar = ({ sidebarCollapsed, setSidebarCollapsed, activeSection, setActi
                         key={subItem.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setActiveSection(subItem.id);
+                          handleSetActiveSection(subItem.id);
+                          setExpandedSections({});
                         }}
                         className={`w-full flex items-center space-x-3 px-2 py-1 rounded-md text-left text-sm transition group ${
                           activeSection === subItem.id
